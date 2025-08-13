@@ -18,3 +18,8 @@ ignition/deployments/chain-31337
 
 # deployments
 # ignition/deployments
+
+# Remix IDE additions
+contracts/.states
+contracts/artifacts
+contracts/.deps
