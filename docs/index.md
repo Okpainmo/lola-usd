@@ -32,10 +32,10 @@ Emitted when a withdrawal occurs.
 
 #### Parameters
 
-| Name   | Type    | Description                                 |
-| ------ | ------- | ------------------------------------------- |
-| amount | uint256 | The amount of Ether withdrawn.              |
-| when   | uint256 | The timestamp when the withdrawal occurred. |
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| amount | uint256 | The amount of Ether withdrawn. |
+| when | uint256 | The timestamp when the withdrawal occurred. |
 
 ### constructor
 
@@ -49,9 +49,9 @@ _Requires the unlock time to be in the future._
 
 #### Parameters
 
-| Name         | Type    | Description                                        |
-| ------------ | ------- | -------------------------------------------------- |
-| \_unlockTime | uint256 | The timestamp after which withdrawals are allowed. |
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| _unlockTime | uint256 | The timestamp after which withdrawals are allowed. |
 
 ### withdraw
 
@@ -62,3 +62,4 @@ function withdraw() public
 Withdraws all funds from the contract if the unlock time has passed and caller is the owner.
 
 _Emits a {Withdrawal} event and transfers the full balance to the owner._
+
