@@ -48,14 +48,16 @@ contract LolaUSD {
     }
 
     function totalSupply() public view returns (uint256) {
-        return supply;
+        return supply / (10 ** tokenDecimals);
     }
 
     function balanceOf(address _owner) public view returns (uint256){
-        return balance[_owner];
+        return balance[_owner] / (10 ** tokenDecimals);
     }    
 
     function approve(address _operator, uint256 _value) public returns (bool) {
+        _value = _value * 10 ** tokenDecimals;
+
         if(_operator == address(0)) {
             revert LolaUSD__OperatorAddressIsZeroAddress();
         }
@@ -63,14 +65,17 @@ contract LolaUSD {
         allowedSpend[msg.sender][_operator] = _value; // user(msg.sender) allows platform/operator, e.g. a DEX, to currently be able to spend '_value' amount from their balance
 
         emit Approval(msg.sender, _operator, _value);
+        
         return true;
     }
 
     function allowance(address _owner, address _operator) public view returns (uint256) {
-        return allowedSpend[_owner][_operator]; // check how much a user has allowed an operator to spend
+        return allowedSpend[_owner][_operator] / (10 ** tokenDecimals); // check how much a user has allowed an operator to spend
     }
 
     function increaseAllowance(address _operator, uint256 _amountToAdd) external returns (bool) {
+        _amountToAdd = _amountToAdd * 10 ** tokenDecimals;
+
         if (_operator == address(0)) {
             revert LolaUSD__OperatorAddressIsZeroAddress();
         }
@@ -85,6 +90,8 @@ contract LolaUSD {
     }
 
     function decreaseAllowance(address _operator, uint256 _amountToDeduct) external returns (bool) {
+        _amountToDeduct = _amountToDeduct * 10 ** tokenDecimals;
+
         if (_operator == address(0)) {
             revert LolaUSD__OperatorAddressIsZeroAddress();
         } 
@@ -95,7 +102,7 @@ contract LolaUSD {
             revert LolaUSD__ExcessAllowanceDecrement();
         } 
 
-        uint256 newAllowance = currentAllowance - _amountToDeduct;
+        uint256 newAllowance = currentAllowance - (_amountToDeduct);
 
         allowedSpend[msg.sender][_operator] = newAllowance;
 
@@ -105,6 +112,8 @@ contract LolaUSD {
     }
     
     function transfer(address _receiver, uint256 _value) public returns (bool) {
+        _value = _value * 10 ** tokenDecimals;
+
         if(_receiver == address(0)) {
             revert LolaUSD__ReceiverAddressIsZeroAddress();
         }
@@ -113,8 +122,8 @@ contract LolaUSD {
             revert LolaUSD__InsufficientBalance();
         }
 
-        balance[msg.sender] -= _value;
-        balance[_receiver] += _value;
+        balance[msg.sender] -= (_value);
+        balance[_receiver] += (_value);
 
         emit Transfer(msg.sender, _receiver, _value);
 
@@ -122,6 +131,8 @@ contract LolaUSD {
     }
 
     function transferFrom(address _owner, address _receiver, uint256 _value) public returns (bool) {
+        _value = _value * 10 ** tokenDecimals;
+
         if (_receiver == address(0)) {
             revert LolaUSD__ReceiverAddressIsZeroAddress();
         }
@@ -159,6 +170,8 @@ contract LolaUSD {
     }
 
     function mint(address _to, uint256 _amount, uint256 _proposalId, string memory _proposalCodeName) public  {
+        _amount = _amount * 10 ** tokenDecimals;
+
         if(!adminMangementContract.checkIsAdmin(msg.sender)) {
             revert LolaUSD__AccessDenied_AdminOnly();
         }
@@ -188,6 +201,8 @@ contract LolaUSD {
     }
 
     function burn(address _from, uint256 _amount, uint256 _proposalId, string memory _proposalCodeName) public {
+        _amount = _amount * 10 ** tokenDecimals;
+
         if(!adminMangementContract.checkIsAdmin(msg.sender)) {
             revert LolaUSD__AccessDenied_AdminOnly();
         }
