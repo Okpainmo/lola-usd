@@ -10,19 +10,20 @@ contract Core__LolaUSD is LolaUSD {
     error LolaUSDCore__AirdropLimitCannotBeZero();
     error LolaUSDCore__AccessDenied_AdminOnly();
     error LolaUSDCore__AirdropFailed();
+    error LolaUSDCore__LogoNameCannotBeEmpty();
 
     event Logs(string message, uint256 timestamp, string indexed contractName);
 
     string private constant CONTRACT_NAME = "Core__LolaUSD"; // set in one place to avoid mispelling elsewhere
     address private i_owner;
     string private tokenImageCID;
-    string private tokenMetaDataCID;
+    string private tokenMetadataCID;
 
     /*---------------- airdrop functionality -----------------*/
     /*---------------- airdrop functionality -----------------*/
 
-    uint256 private s_airdropAmount = 10 * 10 ** 18; // 10 USDL
-    uint256 private s_airdropLimit = 100;
+    uint256 private s_airdropAmount; // 10 USDL
+    uint256 private s_airdropLimit;
     mapping(address => bool) private s_hasReceivedAirdrop;
 
     struct Airdrop {
@@ -38,7 +39,7 @@ contract Core__LolaUSD is LolaUSD {
     constructor(
         string memory _tokenName,
         string memory _tokenLogoCID,
-        string memory _tokenMetaDataCID,
+        string memory _tokenMetadataCID,
         string memory _tokenSymbol,
         uint8 _decimals,
         uint256 _supply,
@@ -49,17 +50,23 @@ contract Core__LolaUSD is LolaUSD {
         tokenSymbol = _tokenSymbol;
         tokenDecimals = _decimals;
         i_owner = msg.sender;
-        supply = _supply * 10 ** 18;
+        supply = _supply * 10 ** tokenDecimals;
 
-        tokenMetaDataCID = _tokenMetaDataCID;
+        tokenMetadataCID = _tokenMetadataCID;
         tokenImageCID = _tokenLogoCID;
 
         s_adminManagementCoreContractAddress = _adminManagementCoreContractAddress; // needed to check admin rights and likely more
         s_proposalManagementCoreContractAddress = _proposalManagementCoreContractAddress;
 
+        s_airdropAmount = 10 * 10 ** tokenDecimals;
+        s_airdropLimit = 100;
+
         balance[msg.sender] = supply;
         emit Transfer(address(0), msg.sender, supply);
 
+        // approve externally deployed airdrop contract to spend airdrop allocation 
+        // approve(s_airdropContractAddress, s_airdropLimit * s_airdropAmount);
+        
         emit Logs(
             "contract deployed successfully with constructor chores completed",
             block.timestamp,
@@ -75,9 +82,21 @@ contract Core__LolaUSD is LolaUSD {
         return i_owner;
     }
 
+    function getAdminManagementCoreContractAddress() public view returns(address) {
+        return s_adminManagementCoreContractAddress;
+    }
+
+    function getProposalManagementCoreContractAddress() public view returns(address) {
+        return s_proposalManagementCoreContractAddress;
+    }
+
     function updateAdminManagementCoreContractAddress(
         address _newAddress
     ) public {
+        if (!adminMangementContract.checkIsAdmin(msg.sender)) {
+            revert LolaUSDCore__AccessDenied_AdminOnly();
+        }
+
         if (_newAddress == address(0)) {
             revert LolaUSDCore__ZeroAddressError();
         }
@@ -88,11 +107,43 @@ contract Core__LolaUSD is LolaUSD {
     function updateProposalManagementCoreContractAddress(
         address _newAddress
     ) public {
+        if (!adminMangementContract.checkIsAdmin(msg.sender)) {
+            revert LolaUSDCore__AccessDenied_AdminOnly();
+        }
+
         if (_newAddress == address(0)) {
             revert LolaUSDCore__ZeroAddressError();
         }
 
         s_proposalManagementCoreContractAddress = _newAddress;
+    }
+
+    function getTokenLogo() public view returns(string memory){
+        return tokenImageCID;
+    }
+
+    function getTokenMetadata() public view returns(string memory){
+        return tokenMetadataCID;
+    }
+
+    function updateTokenLogo(string memory _newLogoCID) public {
+        if (!adminMangementContract.checkIsAdmin(msg.sender)) {
+            revert LolaUSDCore__AccessDenied_AdminOnly();
+        }
+
+        if (bytes(_newLogoCID).length < 1) revert LolaUSDCore__LogoNameCannotBeEmpty();
+
+        tokenImageCID = _newLogoCID;
+    }
+
+    function updateTokenMetaData(string memory _newMetaDataCID) public {
+        if (!adminMangementContract.checkIsAdmin(msg.sender)) {
+            revert LolaUSDCore__AccessDenied_AdminOnly();
+        }
+
+        if (bytes(_newMetaDataCID).length < 1) revert LolaUSDCore__LogoNameCannotBeEmpty();
+        
+        tokenMetadataCID = _newMetaDataCID;
     }
 
     function ping() external view returns (string memory, address, uint256) {
@@ -102,7 +153,8 @@ contract Core__LolaUSD is LolaUSD {
     /*---------------- airdrop functionality -----------------*/
     /*---------------- airdrop functionality -----------------*/
 
-    // potential todo: consider keeping aridrop funds in a separate wallet, and processing from that wallet - for added safety.
+    /* todo: consider creating an airdrop contract, and using 'allowance' to give the airdrop contract permission to be
+    able to send up to the total airdrop allocation amount - see commented implementation inside constructor block above. */
     function airdrop() public {
         if (s_hasReceivedAirdrop[msg.sender]) {
             revert LolaUSDCore__WalletAlreadyReceivedAirdrop();
@@ -112,22 +164,16 @@ contract Core__LolaUSD is LolaUSD {
             revert LolaUSDCore__AirdropCampaignEnded();
         }
 
-        if (msg.sender == address(0)) {
-            revert LolaUSD__OperatorAddressIsZeroAddress();
-        }
-
-        // approve the deduction from token holder(owner) wallet
-        allowedSpend[i_owner][msg.sender] = s_airdropAmount; // user(i_owner) allows platform/operator, e.g. a DEX, to currently be able to spend '_value' amount from their balance
-
-        emit Approval(i_owner, msg.sender, s_airdropAmount);
-
-        // now process with "transferFrom"
-        bool success = transferFrom(i_owner, msg.sender, s_airdropAmount);
-        if (!success) {
-            revert LolaUSDCore__AirdropFailed();
+        if(s_airdropAmount > balance[i_owner]) {
+            revert LolaUSDCore__AirdropCampaignEnded();
         }
 
         s_hasReceivedAirdrop[msg.sender] = true;
+
+        balance[i_owner] -= s_airdropAmount;
+        balance[msg.sender] += s_airdropAmount;
+
+        emit Transfer(i_owner, msg.sender, s_airdropAmount);
 
         Airdrop memory newAirdrop = Airdrop({
             recipient: msg.sender,
@@ -149,7 +195,9 @@ contract Core__LolaUSD is LolaUSD {
         return s_airdropLimit;
     }
 
-    function updateAirdropLimit(uint256 _newAirdropLimit) public {
+    function updateAirdropCampaign(uint256 _newAirdropLimit, uint256 _newAirdropAmount) public {
+        _newAirdropAmount = _newAirdropAmount * 10 ** tokenDecimals;
+
         if (!adminMangementContract.checkIsAdmin(msg.sender)) {
             revert LolaUSDCore__AccessDenied_AdminOnly();
         }
@@ -159,6 +207,7 @@ contract Core__LolaUSD is LolaUSD {
         }
 
         s_airdropLimit = _newAirdropLimit;
+        s_airdropAmount = _newAirdropAmount;
     }
 
     /*---------------- airdrop functionality -----------------*/
