@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 // import "./interfaces/Interface__AdminManagement.sol";
 
-interface IProposalManagement {
+interface IProposalManagement__Base {
     // ------------------------
     // Errors
     // ------------------------
